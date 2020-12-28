@@ -1,0 +1,13 @@
+After tired of struggling with existing classes and functions to upload and download Excel files to/from ABAP internal tables, I've decided to develop mine..
+
+I called it ZCL_GUI_EXCEL_SERVICES. It has two main methods: EXCEL_FILE_UPLOAD and EXCEL_FILE_DOWNLOAD.
+
+IN MY HUMBLE OPINION, THIS IS THE MOST FLEXIBLE, MOST STABLE AND THE FASTEST ONE I'VE MET SO FAR.
+
+Particulary useful is the ability of this class to handle the upload and download of character fields containig CRs, LFs and TABs properly. All other classes and functions I've tried got lost with that.
+
+To use it, download the TXT file, go to transaction SE24 and create an empty class named ZCL_GUI_EXCEL_SERVICES.
+
+After creating the empty class, use button "Source Code-Based" also in SE24 to do a copy / paste of TXT file contents to it.
+
+lino2112@gmail.com
