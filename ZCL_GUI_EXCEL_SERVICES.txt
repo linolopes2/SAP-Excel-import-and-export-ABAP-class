@@ -1,0 +1,2037 @@
+* Developed by Lino Lopes (lino2112@gmail.com, lino@cdtecnologia.com.br)
+* Version 1.01 - Nov-25th-2020
+*  - Now GET_C accounts for CR_LF at the end of each line
+*
+*GC_ERROR_NOT_STRUCTURE        `Table workarea is not a structure`
+*GC_ERROR_FIELD_NOT_FOUND      `Field '&' not found in table`
+*GC_ERROR_NOT_ELEMENTARY       `Table field '&' is not an elementary field`
+*GC_ERROR_INVALID_ELEMENTARY   `Type of table field '&' not supported`
+*GC_ERROR_STARTING_EXCEL       `Error starting Excel`
+*GC_ERROR_OPENING_EXCEL_FILE   `Error opening the Excel file`
+*GC_ERROR_WORKSHEET_NOT_FOUND  `Worksheet '&' not found`
+*GC_ERROR_NOT_ENOUGH_FIELDS    `Not enough table fields were specified for all Excel file columns`
+*GC_ERROR_TABLE_IS_EMPTY       `Table is empty`
+*GC_ERROR_EXCEL_FILE_IS_EMPTY  `Excel file is empty`
+*GC_ERROR_CLIPBOARD_EXPORT     `Error exporting table contents to clipboard`
+*GC_ERROR_INVALID_DATE         `Invalid date '&'`
+*GC_ERROR_INVALID_TIME         `Invalid time '&'`
+*GC_ERROR_INVALID_LARGE_NUMBER `Number '&' too large or has an invalid format`
+*GC_ERROR_INVALID_HEADER       `Header does not contain table field names`
+*
+*GC_ERROR_NOT_STRUCTURE        `Workarea da tabela não é uma estrutura`
+*GC_ERROR_FIELD_NOT_FOUND      `Campo '&' não encontrado na tabela`
+*GC_ERROR_NOT_ELEMENTARY       `Campo '&' da tabela não é um campo elementar`
+*GC_ERROR_INVALID_ELEMENTARY   `Tipo do campo '&' da tabela não suportado`
+*GC_ERROR_STARTING_EXCEL       `Erro ao iniciar o Excel`
+*GC_ERROR_OPENING_EXCEL_FILE   `Erro ao abrir o arquivo Excel`
+*GC_ERROR_WORKSHEET_NOT_FOUND  `Worksheet '&' não encontrada`
+*GC_ERROR_NOT_ENOUGH_FIELDS    `Não foram informados campos suficientes para todas as colunas do arquivo Excel`
+*GC_ERROR_TABLE_IS_EMPTY       `A tabela está vazia`
+*GC_ERROR_EXCEL_FILE_IS_EMPTY  `O arquivo Excel está vazio`
+*GC_ERROR_CLIPBOARD_EXPORT     `Erro ao exportar o conteúdo da tabela para o clipboard`
+*GC_ERROR_INVALID_DATE         `Data '&' inválida`
+*GC_ERROR_INVALID_TIME         `Hora '&' inválida`
+*GC_ERROR_INVALID_LARGE_NUMBER `Número '&' é muito grande ou tem formato inválido `
+*GC_ERROR_INVALID_HEADER       `Cabeçalho não contém os nomes das colunas da tabela`
+*
+class ZCL_GUI_EXCEL_SERVICES definition
+  public
+  final
+  create private .
+
+public section.
+  type-pools ABAP .
+  type-pools OLE2 .
+
+  types:
+    ty_t_fieldnames TYPE STANDARD TABLE OF abap_compname WITH NON-UNIQUE KEY table_line .
+  types:
+    BEGIN OF ty_fields,
+        name       TYPE abap_compname,
+        title      TYPE string,
+        width      TYPE i,
+        nodecimals TYPE abap_bool,
+        decimals   TYPE i,
+        halign     TYPE i,
+        valign     TYPE i,
+        color      TYPE i,
+        wrap       TYPE c LENGTH 1,
+        autofit    TYPE c LENGTH 1,
+        format     TYPE string,
+      END OF ty_fields .
+  types:
+    ty_t_fields TYPE STANDARD TABLE OF ty_fields WITH NON-UNIQUE KEY name .
+
+  constants:
+    BEGIN OF gc_valign,
+        bottom      TYPE i VALUE -4107,
+        center      TYPE i VALUE -4108,
+        distributed TYPE i VALUE -4117,
+        justify     TYPE i VALUE -4130,
+        top         TYPE i VALUE -4160.
+    CONSTANTS: END OF gc_valign .
+  constants:
+    BEGIN OF gc_halign,
+        center                TYPE i VALUE -4108,
+        centeracrossselection TYPE i VALUE     7,
+        distributed           TYPE i VALUE -4117,
+        fill                  TYPE i VALUE     5,
+        general               TYPE i VALUE     1,
+        justify               TYPE i VALUE -4130,
+        left                  TYPE i VALUE -4131,
+        right                 TYPE i VALUE -4152.
+    CONSTANTS: END OF gc_halign .
+  constants GC_ERROR_NOT_STRUCTURE type STRING value `Workarea da tabela não é uma estrutura` ##NO_TEXT.
+  constants GC_ERROR_FIELD_NOT_FOUND type STRING value `Campo '&' não encontrado na tabela` ##NO_TEXT.
+  constants GC_ERROR_NOT_ELEMENTARY type STRING value `Campo '&' da tabela não é um campo elementar` ##NO_TEXT.
+  constants GC_ERROR_INVALID_ELEMENTARY type STRING value `Tipo do campo '&' da tabela não suportado` ##NO_TEXT.
+  constants GC_ERROR_STARTING_EXCEL type STRING value `Erro ao iniciar o Excel` ##NO_TEXT.
+  constants GC_ERROR_OPENING_EXCEL_FILE type STRING value `Erro ao abrir o arquivo Excel` ##NO_TEXT.
+  constants GC_ERROR_WORKSHEET_NOT_FOUND type STRING value `Worksheet '&' não encontrada` ##NO_TEXT.
+  constants GC_ERROR_NOT_ENOUGH_FIELDS type STRING value `Não foram informados campos suficientes para todas as colunas do arquivo Excel` ##NO_TEXT.
+  constants GC_ERROR_TABLE_IS_EMPTY type STRING value `A tabela está vazia` ##NO_TEXT.
+  constants GC_ERROR_EXCEL_FILE_IS_EMPTY type STRING value `O arquivo Excel está vazio` ##NO_TEXT.
+  constants GC_ERROR_CLIPBOARD_EXPORT type STRING value `Erro ao exportar o conteúdo da tabela para o clipboard` ##NO_TEXT.
+  constants GC_ERROR_INVALID_DATE type STRING value `Data '&' inválida` ##NO_TEXT.
+  constants GC_ERROR_INVALID_TIME type STRING value `Hora '&' inválida` ##NO_TEXT.
+  constants GC_ERROR_INVALID_LARGE_NUMBER type STRING value `Número '&' é muito grande ou tem formato inválido ` ##NO_TEXT.
+  constants GC_ERROR_INVALID_HEADER type STRING value `Cabeçalho não contém os nomes das colunas da tabela` ##NO_TEXT.
+
+  class-methods EXCEL_FILE_UPLOAD
+    importing
+      value(IV_FILENAME) type CSEQUENCE
+      value(IV_HEADER) type ABAP_BOOL default ABAP_TRUE
+      value(IV_COLUMN_NAMES_FROM_HEADER) type ABAP_BOOL default ABAP_FALSE
+      value(IV_IGNORE_CLIENT) type ABAP_BOOL default ABAP_TRUE
+      value(IV_EXCEL_WORKSHEET_NAME) type CSEQUENCE optional
+      value(IV_DECIMAL_SEPARATOR) type C optional
+      value(IV_EXCEL_DATE_FORMAT) type XUDATFM default SPACE
+      !IT_FIELDNAMES type TY_T_FIELDNAMES optional
+    exporting
+      !ET_TABLE type STANDARD TABLE
+    exceptions
+      ERROR_STARTING_EXCEL
+      ERROR_OPENING_EXCEL_FILE
+      ERROR_NOT_ENOUGH_FIELDS
+      ERROR_EXCEL_FILE_IS_EMPTY
+      ERROR_NOT_STRUCTURE
+      ERROR_FIELD_NOT_FOUND
+      ERROR_NOT_ELEMENTARY
+      ERROR_INVALID_ELEMENTARY
+      ERROR_WORKSHEET_NOT_FOUND
+      ERROR_INVALID_DATE
+      ERROR_INVALID_TIME
+      ERROR_INVALID_LARGE_NUMBER
+      ERROR_INVALID_HEADER .
+  class-methods EXCEL_FILE_DOWNLOAD
+    importing
+      value(IV_FILENAME) type CSEQUENCE
+      value(IV_HEADER) type ABAP_BOOL default ABAP_TRUE
+      value(IV_EXCEL_COLUMNS_FROM_TABLE) type ABAP_BOOL default ABAP_TRUE
+      value(IV_COLUMN_NAMES_TO_HEADER) type ABAP_BOOL default ABAP_FALSE
+      value(IV_IGNORE_CLIENT) type ABAP_BOOL default ABAP_TRUE
+      value(IV_EXCEL_WORKSHEET_NAME) type CSEQUENCE optional
+      value(IV_EXCEL_DATE_FORMAT) type XUDATFM default SPACE
+      value(IV_DONT_FORMAT_EXCEL_COLUMNS) type ABAP_BOOL default ABAP_FALSE
+      value(IV_DEFAULT_AUTOFIT) type C default SPACE
+      value(IV_DEFAULT_WRAPTEXT) type C default SPACE
+      value(IV_DEFAULT_VALIGNMENT) type I default GC_VALIGN-TOP
+      value(IV_HEADER_COLOR) type I default 15
+      !IT_FIELDS type TY_T_FIELDS optional
+      !IT_TABLE type STANDARD TABLE
+    exceptions
+      ERROR_TABLE_IS_EMPTY
+      ERROR_CLIPBOARD_EXPORT
+      ERROR_STARTING_EXCEL
+      ERROR_NOT_STRUCTURE
+      ERROR_FIELD_NOT_FOUND
+      ERROR_NOT_ELEMENTARY
+      ERROR_INVALID_ELEMENTARY .
+  class-methods GET_COLUMN_NAME
+    importing
+      value(IV_COL) type I
+    returning
+      value(RV_COL_NAME) type STRING .
+  class-methods GET_NUMBER_OF_ROWS_AND_COLUMNS
+    importing
+      !IS_WORKSHEET type OLE2_OBJECT
+    exporting
+      !EV_NUM_ROWS type I
+      !EV_NUM_COLS type I .
+  class-methods START_EXCEL_APPLICATION
+    importing
+      !IV_VISIBLE type ABAP_BOOL default ABAP_FALSE
+    changing
+      !CS_EXCEL type OLE2_OBJECT
+      !CS_WORKBOOKS type OLE2_OBJECT .
+  class-methods STOP_EXCEL_APPLICATION
+    changing
+      !CS_EXCEL type OLE2_OBJECT
+      !CS_WORKBOOKS type OLE2_OBJECT .
+  class-methods CHECK_COLUMNS_FOR_UPLOAD
+    importing
+      !IT_FIELDNAMES type TY_T_FIELDNAMES
+      !IT_TABLE type STANDARD TABLE
+    returning
+      value(RT_FIELDNAMES) type TY_T_FIELDNAMES
+    exceptions
+      ERROR_NOT_STRUCTURE
+      ERROR_FIELD_NOT_FOUND
+      ERROR_NOT_ELEMENTARY
+      ERROR_INVALID_ELEMENTARY .
+  class-methods COMPLETE_COLUMNS_FOR_DOWNLOAD
+    importing
+      value(IV_EXCEL_DATE_FORMAT_STR) type STRING optional
+      value(IV_EXCEL_COLUMNS_FROM_TABLE) type ABAP_BOOL default ABAP_TRUE
+      value(IV_COLUMN_NAMES_TO_HEADER) type ABAP_BOOL default ABAP_FALSE
+      value(IV_DEFAULT_AUTOFIT) type C default SPACE
+      value(IV_DEFAULT_WRAPTEXT) type C default SPACE
+      value(IV_DEFAULT_VALIGNMENT) type I default GC_VALIGN-TOP
+      !IT_FIELDS type TY_T_FIELDS optional
+      !IT_TABLE type STANDARD TABLE
+    returning
+      value(RT_FIELDS) type TY_T_FIELDS
+    exceptions
+      ERROR_NOT_STRUCTURE
+      ERROR_FIELD_NOT_FOUND
+      ERROR_NOT_ELEMENTARY
+      ERROR_INVALID_ELEMENTARY .
+  class-methods GET_DECIMAL_SEPARATOR
+    importing
+      value(IV_UNAME) type BNAME optional
+    returning
+      value(RV_DECIMAL_SEPARATOR) type CHAR1 .
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+
+
+CLASS ZCL_GUI_EXCEL_SERVICES IMPLEMENTATION.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_GUI_EXCEL_SERVICES=>CHECK_COLUMNS_FOR_UPLOAD
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IT_FIELDNAMES                  TYPE        TY_T_FIELDNAMES
+* | [--->] IT_TABLE                       TYPE        STANDARD TABLE
+* | [<-()] RT_FIELDNAMES                  TYPE        TY_T_FIELDNAMES
+* | [EXC!] ERROR_NOT_STRUCTURE
+* | [EXC!] ERROR_FIELD_NOT_FOUND
+* | [EXC!] ERROR_NOT_ELEMENTARY
+* | [EXC!] ERROR_INVALID_ELEMENTARY
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD check_columns_for_upload.
+
+    DATA: lo_typedescr   TYPE REF TO cl_abap_typedescr,
+          lo_tabledescr  TYPE REF TO cl_abap_tabledescr,
+          lo_structdescr TYPE REF TO cl_abap_structdescr,
+          lt_fieldnames  LIKE it_fieldnames,
+          lv_msg         TYPE string.
+
+    FIELD-SYMBOLS: <fs_fieldnames>  LIKE LINE OF it_fieldnames,
+                   <fs_fieldnames2> LIKE LINE OF lt_fieldnames,
+                   <fs_components>  TYPE LINE OF abap_compdescr_tab.
+
+    REFRESH rt_fieldnames.
+
+    lo_tabledescr ?= cl_abap_typedescr=>describe_by_data( it_table ).
+
+    lo_typedescr ?= lo_tabledescr->get_table_line_type( ).
+    IF lo_typedescr->kind <> cl_abap_typedescr=>kind_struct.
+      MESSAGE gc_error_not_structure TYPE if_xo_const_message=>error RAISING error_not_structure.
+    ENDIF.
+    lo_structdescr ?= lo_typedescr.
+
+    IF it_fieldnames[] IS NOT INITIAL.
+      lt_fieldnames[] = it_fieldnames[].
+    ELSE.
+      LOOP AT lo_structdescr->components ASSIGNING <fs_components>.
+        APPEND INITIAL LINE TO lt_fieldnames ASSIGNING <fs_fieldnames2>.
+        <fs_fieldnames2> = <fs_components>-name.
+      ENDLOOP.
+    ENDIF.
+
+    LOOP AT lt_fieldnames ASSIGNING <fs_fieldnames>.
+
+      TRANSLATE <fs_fieldnames> TO UPPER CASE.
+
+      READ TABLE lo_structdescr->components TRANSPORTING NO FIELDS WITH KEY name = <fs_fieldnames>.
+      IF sy-subrc <> 0.
+        lv_msg = gc_error_field_not_found.
+        REPLACE FIRST OCCURRENCE OF `&` IN lv_msg WITH <fs_fieldnames>.
+        MESSAGE lv_msg TYPE if_xo_const_message=>error RAISING error_field_not_found.
+      ENDIF.
+
+      lo_typedescr = lo_structdescr->get_component_type( <fs_fieldnames> ).
+      IF lo_typedescr->kind <> cl_abap_typedescr=>kind_elem.
+        READ TABLE it_fieldnames TRANSPORTING NO FIELDS WITH KEY table_line = <fs_fieldnames>.
+        IF sy-subrc = 0.
+          lv_msg = gc_error_not_elementary.
+          REPLACE FIRST OCCURRENCE OF `&` IN lv_msg WITH <fs_fieldnames>.
+          MESSAGE lv_msg TYPE if_xo_const_message=>error RAISING error_not_elementary.
+        ELSE.
+          CONTINUE.
+        ENDIF.
+      ENDIF.
+
+      CASE lo_typedescr->type_kind.
+        WHEN cl_abap_typedescr=>typekind_num        OR
+             cl_abap_typedescr=>typekind_char       OR
+             cl_abap_typedescr=>typekind_string     OR
+             cl_abap_typedescr=>typekind_date       OR
+             cl_abap_typedescr=>typekind_time       OR
+             cl_abap_typedescr=>typekind_decfloat   OR
+             cl_abap_typedescr=>typekind_decfloat16 OR
+             cl_abap_typedescr=>typekind_decfloat34 OR
+             cl_abap_typedescr=>typekind_float      OR
+             cl_abap_typedescr=>typekind_int        OR
+             cl_abap_typedescr=>typekind_int1       OR
+             cl_abap_typedescr=>typekind_int2       OR
+             cl_abap_typedescr=>typekind_packed.
+
+        WHEN OTHERS.
+          READ TABLE it_fieldnames TRANSPORTING NO FIELDS WITH KEY table_line = <fs_fieldnames>.
+          IF sy-subrc = 0.
+            lv_msg = gc_error_invalid_elementary.
+            REPLACE FIRST OCCURRENCE OF `&` IN lv_msg WITH <fs_fieldnames>.
+            MESSAGE lv_msg TYPE if_xo_const_message=>error RAISING error_invalid_elementary.
+          ELSE.
+            CONTINUE.
+          ENDIF.
+      ENDCASE.
+
+      APPEND <fs_fieldnames> TO rt_fieldnames.
+
+    ENDLOOP.
+
+  ENDMETHOD.                    "complete_columns_for_upload
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_GUI_EXCEL_SERVICES=>COMPLETE_COLUMNS_FOR_DOWNLOAD
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_EXCEL_DATE_FORMAT_STR       TYPE        STRING(optional)
+* | [--->] IV_EXCEL_COLUMNS_FROM_TABLE    TYPE        ABAP_BOOL (default =ABAP_TRUE)
+* | [--->] IV_COLUMN_NAMES_TO_HEADER      TYPE        ABAP_BOOL (default =ABAP_FALSE)
+* | [--->] IV_DEFAULT_AUTOFIT             TYPE        C (default =SPACE)
+* | [--->] IV_DEFAULT_WRAPTEXT            TYPE        C (default =SPACE)
+* | [--->] IV_DEFAULT_VALIGNMENT          TYPE        I (default =GC_VALIGN-TOP)
+* | [--->] IT_FIELDS                      TYPE        TY_T_FIELDS(optional)
+* | [--->] IT_TABLE                       TYPE        STANDARD TABLE
+* | [<-()] RT_FIELDS                      TYPE        TY_T_FIELDS
+* | [EXC!] ERROR_NOT_STRUCTURE
+* | [EXC!] ERROR_FIELD_NOT_FOUND
+* | [EXC!] ERROR_NOT_ELEMENTARY
+* | [EXC!] ERROR_INVALID_ELEMENTARY
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD complete_columns_for_download.
+
+    DATA: lo_typedescr   TYPE REF TO cl_abap_typedescr,
+          lo_tabledescr  TYPE REF TO cl_abap_tabledescr,
+          lo_structdescr TYPE REF TO cl_abap_structdescr,
+          lo_elemdescr   TYPE REF TO cl_abap_elemdescr,
+          lt_fields      LIKE it_fields,
+          ls_dfies       TYPE dfies,
+          lv_width       TYPE i,
+          lv_len         TYPE i,
+          lv_msg         TYPE string.
+
+    FIELD-SYMBOLS: <fs_fields>     LIKE LINE OF it_fields,
+                   <fs_fields2>    LIKE LINE OF lt_fields,
+                   <fs_components> TYPE LINE OF abap_compdescr_tab.
+
+    REFRESH rt_fields.
+
+    lo_tabledescr ?= cl_abap_typedescr=>describe_by_data( it_table ).
+
+    lo_typedescr ?= lo_tabledescr->get_table_line_type( ).
+    IF lo_typedescr->kind <> cl_abap_typedescr=>kind_struct.
+      MESSAGE gc_error_not_structure TYPE if_xo_const_message=>error RAISING error_not_structure.
+    ENDIF.
+    lo_structdescr ?= lo_typedescr.
+
+    IF iv_default_autofit <> '0' AND
+       iv_default_autofit <> '1'.
+      CLEAR iv_default_autofit.
+    ENDIF.
+
+    IF iv_default_wraptext <> '0' AND
+       iv_default_wraptext <> '1'.
+      CLEAR iv_default_wraptext.
+    ENDIF.
+
+    IF iv_excel_columns_from_table = abap_false AND
+       it_fields[] IS NOT INITIAL.
+      lt_fields[] = it_fields[].
+    ELSE.
+      LOOP AT lo_structdescr->components ASSIGNING <fs_components>.
+        APPEND INITIAL LINE TO lt_fields ASSIGNING <fs_fields>.
+        <fs_fields>-name = <fs_components>-name.
+        READ TABLE it_fields ASSIGNING <fs_fields2> WITH KEY name = <fs_fields>-name.
+        IF sy-subrc = 0.
+          <fs_fields> = <fs_fields2>.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+    LOOP AT lt_fields ASSIGNING <fs_fields>.
+
+      TRANSLATE <fs_fields>-name TO UPPER CASE.
+
+      READ TABLE lo_structdescr->components ASSIGNING <fs_components> WITH KEY name = <fs_fields>-name.
+      IF sy-subrc <> 0.
+        IF it_fields[] IS NOT INITIAL.
+          lv_msg = gc_error_field_not_found.
+          REPLACE FIRST OCCURRENCE OF `&` IN lv_msg WITH <fs_fields>-name.
+          MESSAGE lv_msg TYPE if_xo_const_message=>error RAISING error_field_not_found.
+        ELSE.
+          CONTINUE.
+        ENDIF.
+      ENDIF.
+
+      lo_typedescr = lo_structdescr->get_component_type( <fs_fields>-name ).
+      IF lo_typedescr->kind <> cl_abap_typedescr=>kind_elem.
+        IF it_fields[] IS NOT INITIAL.
+          lv_msg = gc_error_not_elementary.
+          REPLACE FIRST OCCURRENCE OF `&` IN lv_msg WITH <fs_fields>-name.
+          MESSAGE lv_msg TYPE if_xo_const_message=>error RAISING error_not_elementary.
+        ELSE.
+          CONTINUE.
+        ENDIF.
+      ENDIF.
+      lo_elemdescr ?= lo_typedescr.
+
+      IF lo_elemdescr->is_ddic_type( ) = abap_true.
+        ls_dfies = lo_elemdescr->get_ddic_field( ).
+        IF <fs_fields>-title IS INITIAL.
+          IF iv_column_names_to_header = abap_true.
+            <fs_fields>-title = <fs_fields>-name.
+          ELSE.
+            <fs_fields>-title = ls_dfies-fieldtext.
+          ENDIF.
+        ENDIF.
+        IF lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_num        OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_char       OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_string     OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_date       OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_time       OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_decfloat   OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_decfloat16 OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_decfloat34 OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_float      OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_int        OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_int1       OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_int2       OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_packed.
+          IF ls_dfies-outputlen IS NOT INITIAL.
+            lv_width = ls_dfies-outputlen.
+          ELSE.
+            lv_width = 30.
+          ENDIF.
+        ELSE.
+          IF it_fields[] IS NOT INITIAL.
+            lv_msg = gc_error_invalid_elementary.
+            REPLACE FIRST OCCURRENCE OF `&` IN lv_msg WITH <fs_fields>-name.
+            MESSAGE lv_msg TYPE if_xo_const_message=>error RAISING error_invalid_elementary.
+          ELSE.
+            CONTINUE.
+          ENDIF.
+        ENDIF.
+      ELSE.
+        IF <fs_fields>-title IS INITIAL.
+          IF iv_column_names_to_header = abap_true.
+            <fs_fields>-title = <fs_fields>-name.
+          ENDIF.
+        ENDIF.
+        CASE lo_elemdescr->type_kind.
+          WHEN cl_abap_typedescr=>typekind_num OR
+               cl_abap_typedescr=>typekind_char.
+            lv_width = lo_elemdescr->length / cl_abap_char_utilities=>charsize.
+          WHEN cl_abap_typedescr=>typekind_string.
+            lv_width = 30.
+          WHEN cl_abap_typedescr=>typekind_date.
+            lv_width = 10.
+          WHEN cl_abap_typedescr=>typekind_time.
+            lv_width = 8.
+          WHEN cl_abap_typedescr=>typekind_decfloat   OR
+               cl_abap_typedescr=>typekind_decfloat16 OR
+               cl_abap_typedescr=>typekind_decfloat34 OR
+               cl_abap_typedescr=>typekind_float      OR
+               cl_abap_typedescr=>typekind_int        OR
+               cl_abap_typedescr=>typekind_int1       OR
+               cl_abap_typedescr=>typekind_int2       OR
+               cl_abap_typedescr=>typekind_packed.
+            lv_width = 30.
+          WHEN OTHERS.
+            IF it_fields[] IS NOT INITIAL.
+              lv_msg = gc_error_invalid_elementary.
+              REPLACE FIRST OCCURRENCE OF `&` IN lv_msg WITH <fs_fields>-name.
+              MESSAGE lv_msg TYPE if_xo_const_message=>error RAISING error_invalid_elementary.
+            ELSE.
+              CONTINUE.
+            ENDIF.
+        ENDCASE.
+      ENDIF.
+      IF <fs_fields>-width IS INITIAL.
+        lv_len = strlen( <fs_fields>-title ).
+        IF lv_len > lv_width.
+          <fs_fields>-width = lv_len.
+        ELSE.
+          IF lv_width <= 30.
+            <fs_fields>-width = lv_width.
+          ELSE.
+            <fs_fields>-width = 30.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+
+      IF <fs_fields>-valign IS INITIAL.
+        <fs_fields>-valign = iv_default_valignment.
+      ENDIF.
+
+      IF <fs_fields>-halign IS INITIAL.
+        IF lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_num  OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_char OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_string.
+          <fs_fields>-halign = gc_halign-left.
+        ELSEIF lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_date OR
+           lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_time.
+          <fs_fields>-halign = gc_halign-center.
+        ELSEIF lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_decfloat   OR
+               lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_decfloat16 OR
+               lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_decfloat34 OR
+               lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_float      OR
+               lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_int        OR
+               lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_int1       OR
+               lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_int2       OR
+               lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_packed.
+          <fs_fields>-halign = gc_halign-right.
+        ENDIF.
+      ENDIF.
+
+      IF <fs_fields>-autofit <> '0' AND
+         <fs_fields>-autofit <> '1'.
+        CLEAR <fs_fields>-autofit.
+      ENDIF.
+
+      IF <fs_fields>-wrap <> '0' AND
+         <fs_fields>-wrap <> '1'.
+        CLEAR <fs_fields>-wrap.
+      ENDIF.
+
+      IF <fs_fields>-wrap IS INITIAL.
+        IF iv_default_wraptext IS INITIAL.
+          IF lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_string.
+            <fs_fields>-wrap = '1'.
+          ELSEIF lo_elemdescr->type_kind <> cl_abap_typedescr=>typekind_char.
+            <fs_fields>-wrap = '0'.
+          ELSE.
+            IF lv_width <= <fs_fields>-width.
+              <fs_fields>-wrap = '0'.
+            ELSE.
+              <fs_fields>-wrap = '1'.
+            ENDIF.
+          ENDIF.
+        ELSE.
+          <fs_fields>-wrap = iv_default_wraptext.
+        ENDIF.
+      ENDIF.
+
+      IF <fs_fields>-autofit IS INITIAL.
+        IF iv_default_autofit IS INITIAL.
+          <fs_fields>-autofit = '0'.
+        ELSE.
+          <fs_fields>-autofit = iv_default_autofit.
+        ENDIF.
+      ENDIF.
+
+      IF <fs_fields>-format IS INITIAL.
+        CASE lo_elemdescr->type_kind.
+          WHEN cl_abap_typedescr=>typekind_num OR
+               cl_abap_typedescr=>typekind_char OR
+               cl_abap_typedescr=>typekind_string.
+            <fs_fields>-format = `@`.
+          WHEN cl_abap_typedescr=>typekind_date.
+            FIND FIRST OCCURRENCE OF REGEX `^GYY([\.\/\-])MM\1DD` IN iv_excel_date_format_str.
+            IF sy-subrc = 0.
+              CONCATENATE iv_excel_date_format_str+1(1) iv_excel_date_format_str+1(1) iv_excel_date_format_str+1 INTO iv_excel_date_format_str.
+            ELSE.
+              FIND FIRST OCCURRENCE OF REGEX `^([A-Za-z])\1([\.\/\-])([A-Za-z])\3\2([A-Za-z])\4{3}` IN iv_excel_date_format_str.
+              IF sy-subrc <> 0.
+                FIND FIRST OCCURRENCE OF REGEX `^([A-Za-z])\1{3}([\.\/\-])([A-Za-z])\3\2([A-Za-z])\4` IN iv_excel_date_format_str.
+              ENDIF.
+            ENDIF.
+            IF sy-subrc = 0.
+              <fs_fields>-format = iv_excel_date_format_str(10).
+              REPLACE ALL OCCURRENCES OF `.` IN <fs_fields>-format WITH `/`.
+            ELSE.
+              <fs_fields>-format = 'MM/DD/YYYY'.
+            ENDIF.
+          WHEN cl_abap_typedescr=>typekind_time.
+            <fs_fields>-format = `hh:mm:ss`.
+          WHEN cl_abap_typedescr=>typekind_int  OR
+               cl_abap_typedescr=>typekind_int1 OR
+               cl_abap_typedescr=>typekind_int2.
+            <fs_fields>-format = `0`.
+          WHEN cl_abap_typedescr=>typekind_packed.
+            IF <fs_fields>-decimals IS INITIAL AND
+               <fs_fields>-nodecimals = abap_false.
+              DO lo_elemdescr->decimals TIMES.
+                CONCATENATE <fs_fields>-format `0` INTO <fs_fields>-format.
+              ENDDO.
+            ELSE.
+              DO <fs_fields>-decimals TIMES.
+                CONCATENATE <fs_fields>-format `0` INTO <fs_fields>-format.
+              ENDDO.
+            ENDIF.
+            IF <fs_fields>-format IS INITIAL.
+              <fs_fields>-format = `0`.
+            ELSE.
+              CONCATENATE `0.` <fs_fields>-format INTO <fs_fields>-format.
+            ENDIF.
+          WHEN cl_abap_typedescr=>typekind_decfloat   OR
+               cl_abap_typedescr=>typekind_decfloat16 OR
+               cl_abap_typedescr=>typekind_decfloat34 OR
+               cl_abap_typedescr=>typekind_float.
+            IF <fs_fields>-decimals IS INITIAL AND
+               <fs_fields>-nodecimals = abap_false.
+              IF lo_elemdescr->type_kind = cl_abap_typedescr=>typekind_decfloat34.
+                lv_len = 16.
+              ELSE.
+                lv_len = 8.
+              ENDIF.
+              DO lv_len TIMES.
+                CONCATENATE <fs_fields>-format `?` INTO <fs_fields>-format.
+              ENDDO.
+            ELSE.
+              DO <fs_fields>-decimals TIMES.
+                CONCATENATE <fs_fields>-format `?` INTO <fs_fields>-format.
+              ENDDO.
+            ENDIF.
+            IF <fs_fields>-format IS INITIAL.
+              <fs_fields>-format = `0`.
+            ELSE.
+              CONCATENATE `0.` <fs_fields>-format INTO <fs_fields>-format.
+            ENDIF.
+        ENDCASE.
+      ENDIF.
+
+      APPEND <fs_fields> TO rt_fields.
+
+    ENDLOOP.
+
+  ENDMETHOD.                    "COMPLETE_COLUMNS_FOR_DOWNLOAD
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_GUI_EXCEL_SERVICES=>EXCEL_FILE_DOWNLOAD
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_FILENAME                    TYPE        CSEQUENCE
+* | [--->] IV_HEADER                      TYPE        ABAP_BOOL (default =ABAP_TRUE)
+* | [--->] IV_EXCEL_COLUMNS_FROM_TABLE    TYPE        ABAP_BOOL (default =ABAP_TRUE)
+* | [--->] IV_COLUMN_NAMES_TO_HEADER      TYPE        ABAP_BOOL (default =ABAP_FALSE)
+* | [--->] IV_IGNORE_CLIENT               TYPE        ABAP_BOOL (default =ABAP_TRUE)
+* | [--->] IV_EXCEL_WORKSHEET_NAME        TYPE        CSEQUENCE(optional)
+* | [--->] IV_EXCEL_DATE_FORMAT           TYPE        XUDATFM (default =SPACE)
+* | [--->] IV_DONT_FORMAT_EXCEL_COLUMNS   TYPE        ABAP_BOOL (default =ABAP_FALSE)
+* | [--->] IV_DEFAULT_AUTOFIT             TYPE        C (default =SPACE)
+* | [--->] IV_DEFAULT_WRAPTEXT            TYPE        C (default =SPACE)
+* | [--->] IV_DEFAULT_VALIGNMENT          TYPE        I (default =GC_VALIGN-TOP)
+* | [--->] IV_HEADER_COLOR                TYPE        I (default =15)
+* | [--->] IT_FIELDS                      TYPE        TY_T_FIELDS(optional)
+* | [--->] IT_TABLE                       TYPE        STANDARD TABLE
+* | [EXC!] ERROR_TABLE_IS_EMPTY
+* | [EXC!] ERROR_CLIPBOARD_EXPORT
+* | [EXC!] ERROR_STARTING_EXCEL
+* | [EXC!] ERROR_NOT_STRUCTURE
+* | [EXC!] ERROR_FIELD_NOT_FOUND
+* | [EXC!] ERROR_NOT_ELEMENTARY
+* | [EXC!] ERROR_INVALID_ELEMENTARY
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD excel_file_download.
+
+    DATA: ls_excel     TYPE ole2_object,
+          ls_workbooks TYPE ole2_object,
+          ls_workbook  TYPE ole2_object,
+          ls_worksheet TYPE ole2_object,
+          ls_rangews   TYPE ole2_object,
+          ls_range     TYPE ole2_object,
+          ls_interior  TYPE ole2_object.
+
+    DATA: lt_excel_tab             TYPE TABLE OF string,
+          lt_fields                TYPE ty_t_fields,
+          lt_fixed_values          TYPE ddfixvalues,
+          lv_excel_date_format_str TYPE string,
+          lv_value                 TYPE string,
+          lo_tabledescr            TYPE REF TO cl_abap_tabledescr,
+          lo_elemdescr             TYPE REF TO cl_abap_elemdescr,
+          lo_typedescr             TYPE REF TO cl_abap_typedescr,
+          ls_dfies                 TYPE dfies,
+          lr_table                 TYPE REF TO data,
+          lv_field                 TYPE string,
+          lv_rc                    TYPE sy-subrc,
+          lv_col                   TYPE i,
+          lv_len                   TYPE i,
+          lv_max_len               TYPE i,
+          lv_num_rows              TYPE i,
+          lv_num_cols              TYPE i,
+          lv_filename              TYPE string,
+          lv_excel_worksheet_name  TYPE string,
+          lv_top_left_cell         TYPE string,
+          lv_bottom_right_cell     TYPE string.
+
+    FIELD-SYMBOLS: <fs>              TYPE any,
+                   <fs_data>         TYPE any,
+                   <fs_table>        TYPE STANDARD TABLE,
+                   <fs_fields>       LIKE LINE OF lt_fields,
+                   <fs_excel_tab>    LIKE LINE OF lt_excel_tab,
+                   <fs_fixed_values> LIKE LINE OF lt_fixed_values.
+
+    IF it_table[] IS INITIAL.
+      MESSAGE gc_error_table_is_empty TYPE if_xo_const_message=>error RAISING error_table_is_empty.
+    ENDIF.
+
+    lo_elemdescr ?= cl_abap_typedescr=>describe_by_name( 'XUDATFM' ).
+    lt_fixed_values = lo_elemdescr->get_ddic_fixed_values( 'E' ).
+
+    IF iv_excel_date_format IS NOT INITIAL.
+      READ TABLE lt_fixed_values TRANSPORTING NO FIELDS WITH KEY low    = iv_excel_date_format
+                                                                 option = 'EQ'.
+      IF sy-subrc <> 0.
+        CLEAR iv_excel_date_format.
+      ENDIF.
+    ENDIF.
+
+    IF iv_excel_date_format IS INITIAL.
+      iv_excel_date_format = cl_abap_datfm=>get_datfm( ).
+    ENDIF.
+
+    READ TABLE lt_fixed_values ASSIGNING <fs_fixed_values> WITH KEY low    = iv_excel_date_format
+                                                                    option = 'EQ'.
+    IF sy-subrc = 0.
+      lv_excel_date_format_str = <fs_fixed_values>-ddtext.
+    ENDIF.
+
+    complete_columns_for_download(
+      EXPORTING
+        iv_excel_columns_from_table = iv_excel_columns_from_table
+        iv_column_names_to_header   = iv_column_names_to_header
+        iv_excel_date_format_str    = lv_excel_date_format_str
+        iv_default_autofit          = iv_default_autofit
+        iv_default_wraptext         = iv_default_wraptext
+        iv_default_valignment       = iv_default_valignment
+        it_fields                   = it_fields
+        it_table                    = it_table
+      RECEIVING
+        rt_fields = lt_fields
+      EXCEPTIONS
+            error_not_structure      = 1
+            error_field_not_found    = 2
+            error_not_elementary     = 3
+            error_invalid_elementary = 4
+            OTHERS                   = 5 ).
+    lv_rc = sy-subrc.
+
+    lv_value = sy-msgv1.
+    CASE lv_rc.
+      WHEN 1.
+        MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_not_structure.
+      WHEN 2.
+        MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_field_not_found.
+      WHEN 3.
+        MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_not_elementary.
+      WHEN 4.
+        MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_invalid_elementary.
+    ENDCASE.
+
+    IF iv_ignore_client = abap_true.
+      READ TABLE it_table ASSIGNING <fs_data> INDEX 1.
+      IF sy-subrc = 0.
+        ASSIGN COMPONENT 1 OF STRUCTURE <fs_data> TO <fs>.
+        IF sy-subrc = 0.
+          lo_typedescr = cl_abap_typedescr=>describe_by_data( <fs> ).
+          IF lo_typedescr->kind = cl_abap_typedescr=>kind_elem.
+            lo_elemdescr ?= lo_typedescr.
+            IF lo_elemdescr->is_ddic_type( ) = abap_true.
+              ls_dfies = lo_elemdescr->get_ddic_field( ).
+              IF ls_dfies-datatype = 'CLNT' AND
+                 lines( lt_fields ) > 1.
+                DELETE lt_fields INDEX 1.
+              ENDIF.
+            ENDIF.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    IF iv_header = abap_true.
+
+      APPEND INITIAL LINE TO lt_excel_tab ASSIGNING <fs_excel_tab>.
+
+      LOOP AT lt_fields ASSIGNING <fs_fields>.
+
+        REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>cr_lf(1) IN <fs_fields>-title
+          WITH cl_abap_char_utilities=>vertical_tab.
+
+        REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline IN <fs_fields>-title
+          WITH cl_abap_char_utilities=>form_feed.
+
+        REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>horizontal_tab IN <fs_fields>-title
+          WITH cl_abap_char_utilities=>backspace.
+
+        CONCATENATE <fs_excel_tab> <fs_fields>-title INTO <fs_excel_tab> SEPARATED BY cl_abap_char_utilities=>horizontal_tab.
+
+      ENDLOOP.
+
+      SHIFT <fs_excel_tab> LEFT BY 1 PLACES.
+
+      lv_max_len = strlen( <fs_excel_tab> ).
+
+    ENDIF.
+
+    LOOP AT it_table ASSIGNING <fs_data>.
+
+      APPEND INITIAL LINE TO lt_excel_tab ASSIGNING <fs_excel_tab>.
+
+      LOOP AT lt_fields ASSIGNING <fs_fields>.
+
+        ASSIGN COMPONENT <fs_fields>-name OF STRUCTURE <fs_data> TO <fs>.
+        CHECK sy-subrc = 0.
+
+        CLEAR lv_field.
+        CASE cl_abap_typedescr=>describe_by_data( <fs> )->type_kind.
+          WHEN cl_abap_typedescr=>typekind_num.
+            IF <fs> IS NOT INITIAL AND
+               <fs> CN '0'.
+              lv_field = <fs>.
+            ENDIF.
+
+          WHEN cl_abap_typedescr=>typekind_date.
+            IF <fs> IS NOT INITIAL AND
+               <fs> CN `0`.
+              CALL METHOD cl_abap_datfm=>conv_date_int_to_ext
+                EXPORTING
+                  im_datint   = <fs>
+                  im_datfmdes = iv_excel_date_format
+                IMPORTING
+                  ex_datext   = lv_field.
+            ENDIF.
+
+          WHEN cl_abap_typedescr=>typekind_time.
+            IF <fs> IS NOT INITIAL.
+              lv_field = <fs>+0(2) && `:` && <fs>+2(2) && `:` && <fs>+4(2).
+            ENDIF.
+
+          WHEN cl_abap_typedescr=>typekind_decfloat   OR
+               cl_abap_typedescr=>typekind_decfloat16 OR
+               cl_abap_typedescr=>typekind_decfloat34 OR
+               cl_abap_typedescr=>typekind_float      OR
+               cl_abap_typedescr=>typekind_int        OR
+               cl_abap_typedescr=>typekind_int1       OR
+               cl_abap_typedescr=>typekind_int2       OR
+               cl_abap_typedescr=>typekind_packed.
+            IF <fs> IS NOT INITIAL.
+              lv_field = <fs>.
+              CONDENSE lv_field NO-GAPS.
+            ENDIF.
+
+          WHEN OTHERS.
+            IF <fs> IS NOT INITIAL.
+              lv_field = <fs>.
+
+              REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>cr_lf(1) IN lv_field
+                  WITH cl_abap_char_utilities=>vertical_tab.
+
+              REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline IN lv_field
+                WITH cl_abap_char_utilities=>form_feed.
+
+              REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>horizontal_tab IN lv_field
+                WITH cl_abap_char_utilities=>backspace.
+            ENDIF.
+        ENDCASE.
+
+        CONCATENATE <fs_excel_tab> lv_field INTO <fs_excel_tab> SEPARATED BY cl_abap_char_utilities=>horizontal_tab.
+
+      ENDLOOP.
+
+      SHIFT <fs_excel_tab> LEFT BY 1 PLACES.
+
+      lv_len = strlen( <fs_excel_tab> ).
+      IF  lv_len > lv_max_len.
+        lv_max_len = lv_len.
+      ENDIF.
+
+    ENDLOOP.
+
+    lv_field = iv_filename.
+    cl_gui_frontend_services=>file_delete(
+      EXPORTING
+        filename             = lv_field
+      CHANGING
+        rc                   = lv_rc
+      EXCEPTIONS
+        file_delete_failed   = 1
+        cntl_error           = 2
+        error_no_gui         = 3
+        file_not_found       = 4
+        access_denied        = 5
+        unknown_error        = 6
+        not_supported_by_gui = 7
+        wrong_parameter      = 8
+        OTHERS               = 9 ).
+
+    lo_elemdescr = cl_abap_elemdescr=>get_c( lv_max_len ).
+    lo_tabledescr = cl_abap_tabledescr=>create( lo_elemdescr ).
+    CREATE DATA lr_table TYPE HANDLE lo_tabledescr.
+    ASSIGN lr_table->* TO <fs_table>.
+
+    <fs_table>[] = lt_excel_tab[].
+
+    cl_gui_frontend_services=>clipboard_export(
+      IMPORTING
+        data                 = <fs_table>
+      CHANGING
+        rc                   = lv_rc
+      EXCEPTIONS
+        cntl_error           = 1
+        error_no_gui         = 2
+        not_supported_by_gui = 3
+        no_authority         = 4
+        OTHERS               = 5 ).
+
+    IF sy-subrc <> 0 OR
+       lv_rc IS NOT INITIAL.
+      MESSAGE gc_error_clipboard_export TYPE if_xo_const_message=>error RAISING error_clipboard_export.
+    ENDIF.
+
+    start_excel_application(
+      CHANGING
+        cs_excel     = ls_excel
+        cs_workbooks = ls_workbooks ).
+
+    IF ls_excel IS INITIAL.
+      REFRESH <fs_table>.
+      cl_gui_frontend_services=>clipboard_export(
+        IMPORTING
+          data                 = <fs_table>
+        CHANGING
+          rc                   = lv_rc
+        EXCEPTIONS
+          cntl_error           = 1
+          error_no_gui         = 2
+          not_supported_by_gui = 3
+          no_authority         = 4
+          OTHERS               = 5 ).
+      MESSAGE gc_error_starting_excel TYPE if_xo_const_message=>error RAISING error_starting_excel.
+    ENDIF.
+
+    SET PROPERTY OF ls_excel 'SHEETSINNEWWORKBOOK' = 1.
+
+    CALL METHOD OF
+      ls_workbooks
+        'ADD' = ls_workbook.
+
+    lv_num_rows = lines( <fs_table> ).
+    lv_num_cols = lines( lt_fields ).
+
+    GET PROPERTY OF ls_workbook 'ACTIVESHEET' = ls_worksheet.
+
+    IF iv_excel_worksheet_name IS NOT INITIAL.
+      lv_excel_worksheet_name = iv_excel_worksheet_name.
+      SET PROPERTY OF ls_worksheet 'NAME' = lv_excel_worksheet_name.
+    ENDIF.
+
+    lv_top_left_cell = `A1`.
+
+    lv_field = lv_num_rows.
+    CONDENSE lv_field NO-GAPS.
+    lv_bottom_right_cell = get_column_name( lv_num_cols ).
+    CONCATENATE lv_bottom_right_cell lv_field INTO lv_bottom_right_cell.
+
+    GET PROPERTY OF ls_worksheet 'RANGE' = ls_rangews
+      EXPORTING
+        #1 = lv_top_left_cell
+        #2 = lv_bottom_right_cell.
+
+    SET PROPERTY OF ls_rangews 'NUMBERFORMAT' = `@`.
+
+    IF iv_dont_format_excel_columns <> abap_true.
+
+      LOOP AT lt_fields ASSIGNING <fs_fields>.
+        lv_col = sy-tabix.
+
+        GET PROPERTY OF ls_worksheet 'COLUMNS' = ls_range
+          EXPORTING
+            #1 = lv_col.
+
+        IF <fs_fields>-width IS NOT INITIAL.
+          SET PROPERTY OF ls_range 'COLUMNWIDTH' = <fs_fields>-width.
+        ENDIF.
+
+        IF <fs_fields>-valign IS NOT INITIAL.
+          SET PROPERTY OF ls_range 'VERTICALALIGNMENT' = <fs_fields>-valign.
+        ENDIF.
+
+        IF <fs_fields>-halign IS NOT INITIAL.
+          SET PROPERTY OF ls_range 'HORIZONTALALIGNMENT' = <fs_fields>-halign.
+        ENDIF.
+
+        IF <fs_fields>-wrap = '1'.
+          lv_len = 1.
+        ELSE.
+          lv_len = 0.
+        ENDIF.
+        SET PROPERTY OF ls_range 'WRAPTEXT' = lv_len.
+
+        IF <fs_fields>-color IS NOT INITIAL.
+          GET PROPERTY OF ls_range 'INTERIOR' = ls_interior.
+          SET PROPERTY OF ls_interior 'COLORINDEX' = <fs_fields>-color.
+          FREE OBJECT: ls_interior.
+          CLEAR: ls_interior.
+        ENDIF.
+
+        IF <fs_fields>-format IS NOT INITIAL.
+          SET PROPERTY OF ls_range 'NUMBERFORMAT' = <fs_fields>-format.
+        ENDIF.
+
+        IF <fs_fields>-autofit = '1'.
+          CALL METHOD OF
+            ls_range
+            'AUTOFIT'.
+        ENDIF.
+
+        FREE OBJECT: ls_range.
+        CLEAR: ls_range.
+
+      ENDLOOP.
+
+      IF iv_header_color IS NOT INITIAL.
+
+        GET PROPERTY OF ls_worksheet 'ROWS' = ls_range
+          EXPORTING
+            #1 = 1.
+
+        GET PROPERTY OF ls_range 'INTERIOR' = ls_interior.
+        SET PROPERTY OF ls_interior 'COLORINDEX' = iv_header_color.
+
+        FREE OBJECT: ls_interior, ls_range.
+        CLEAR: ls_interior, ls_range.
+
+      ENDIF.
+
+    ENDIF.
+
+    CALL METHOD OF
+      ls_worksheet
+      'PASTE'.
+
+    CALL METHOD OF
+      ls_rangews
+      'REPLACE'
+      EXPORTING
+        #1 = cl_abap_char_utilities=>backspace
+        #2 = cl_abap_char_utilities=>horizontal_tab.
+
+    CALL METHOD OF
+      ls_rangews
+      'REPLACE'
+      EXPORTING
+        #1 = cl_abap_char_utilities=>form_feed
+        #2 = cl_abap_char_utilities=>newline.
+
+    CALL METHOD OF
+      ls_rangews
+      'REPLACE'
+      EXPORTING
+        #1 = cl_abap_char_utilities=>vertical_tab
+        #2 = cl_abap_char_utilities=>cr_lf(1).
+
+    FREE OBJECT: ls_rangews.
+    CLEAR: ls_rangews.
+
+    GET PROPERTY OF ls_worksheet 'CELLS' = ls_range
+      EXPORTING
+        #1 = 1
+        #2 = 1.
+
+    CALL METHOD OF
+      ls_range
+      'SELECT'.
+
+    FREE OBJECT: ls_range.
+    CLEAR: ls_range.
+
+    REFRESH <fs_table>.
+    cl_gui_frontend_services=>clipboard_export(
+      IMPORTING
+        data                 = <fs_table>
+      CHANGING
+        rc                   = lv_rc
+      EXCEPTIONS
+        cntl_error           = 1
+        error_no_gui         = 2
+        not_supported_by_gui = 3
+        no_authority         = 4
+        OTHERS               = 5 ).
+
+    lv_filename = iv_filename.
+    CALL METHOD OF
+      ls_workbook
+      'SAVEAS'
+      EXPORTING
+        #1 = lv_filename.
+
+    CALL METHOD OF
+      ls_workbook
+      'CLOSE'
+      EXPORTING
+        #1 = 0.
+
+    FREE OBJECT: ls_worksheet, ls_workbook.
+    CLEAR: ls_worksheet, ls_workbook.
+
+    stop_excel_application(
+      CHANGING
+        cs_excel     = ls_excel
+        cs_workbooks = ls_workbooks ).
+
+  ENDMETHOD.                    "excel_file_download
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_GUI_EXCEL_SERVICES=>EXCEL_FILE_UPLOAD
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_FILENAME                    TYPE        CSEQUENCE
+* | [--->] IV_HEADER                      TYPE        ABAP_BOOL (default =ABAP_TRUE)
+* | [--->] IV_COLUMN_NAMES_FROM_HEADER    TYPE        ABAP_BOOL (default =ABAP_FALSE)
+* | [--->] IV_IGNORE_CLIENT               TYPE        ABAP_BOOL (default =ABAP_TRUE)
+* | [--->] IV_EXCEL_WORKSHEET_NAME        TYPE        CSEQUENCE(optional)
+* | [--->] IV_DECIMAL_SEPARATOR           TYPE        C(optional)
+* | [--->] IV_EXCEL_DATE_FORMAT           TYPE        XUDATFM (default =SPACE)
+* | [--->] IT_FIELDNAMES                  TYPE        TY_T_FIELDNAMES(optional)
+* | [<---] ET_TABLE                       TYPE        STANDARD TABLE
+* | [EXC!] ERROR_STARTING_EXCEL
+* | [EXC!] ERROR_OPENING_EXCEL_FILE
+* | [EXC!] ERROR_NOT_ENOUGH_FIELDS
+* | [EXC!] ERROR_EXCEL_FILE_IS_EMPTY
+* | [EXC!] ERROR_NOT_STRUCTURE
+* | [EXC!] ERROR_FIELD_NOT_FOUND
+* | [EXC!] ERROR_NOT_ELEMENTARY
+* | [EXC!] ERROR_INVALID_ELEMENTARY
+* | [EXC!] ERROR_WORKSHEET_NOT_FOUND
+* | [EXC!] ERROR_INVALID_DATE
+* | [EXC!] ERROR_INVALID_TIME
+* | [EXC!] ERROR_INVALID_LARGE_NUMBER
+* | [EXC!] ERROR_INVALID_HEADER
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD excel_file_upload.
+
+    CONSTANTS: lc_pastevalues   TYPE i VALUE -4163,
+               lc_operationnone TYPE i VALUE -4142.
+
+    DATA: ls_excel     TYPE ole2_object,
+          ls_workbooks TYPE ole2_object,
+          ls_workbook  TYPE ole2_object,
+          ls_worksheet TYPE ole2_object,
+          ls_range     TYPE ole2_object.
+
+    DATA: lv_num_rows              TYPE i,
+          lv_num_cols              TYPE i,
+          lv_rc                    TYPE i,
+          lv_top_left_cell         TYPE string,
+          lv_bottom_right_cell     TYPE string,
+          lv_top_left_max_cell     TYPE string,
+          lv_bottom_right_max_cell TYPE string,
+          lt_fieldnames            TYPE ty_t_fieldnames,
+          lt_excel_wa              TYPE STANDARD TABLE OF string,
+          lt_fixed_values          TYPE ddfixvalues,
+          ls_dfies                 TYPE dfies,
+          lv_can_ignore_client     TYPE abap_bool,
+          lv_extra                 TYPE i,
+          lv_value                 TYPE string,
+          lv_value2                TYPE string,
+          lv_hour                  TYPE string,
+          lv_min                   TYPE string,
+          lv_sec                   TYPE string,
+          lv_width                 TYPE i,
+          lo_typedescr             TYPE REF TO cl_abap_typedescr,
+          lo_elemdescr             TYPE REF TO cl_abap_elemdescr,
+          lo_tabledescr            TYPE REF TO cl_abap_tabledescr,
+          lr_t_clipboard           TYPE REF TO data,
+          lr_data                  TYPE REF TO data.
+
+    FIELD-SYMBOLS: <fs>             TYPE any,
+                   <fs_t_clipboard> TYPE STANDARD TABLE,
+                   <fs_clipboard>   TYPE any,
+                   <fs_data>        TYPE any,
+                   <fs_excel_wa>    LIKE LINE OF lt_excel_wa,
+                   <fs_fieldnames>  LIKE LINE OF lt_fieldnames.
+
+    REFRESH et_table.
+
+    IF iv_excel_date_format IS NOT INITIAL.
+      lo_elemdescr ?= cl_abap_typedescr=>describe_by_name( 'XUDATFM' ).
+      lt_fixed_values = lo_elemdescr->get_ddic_fixed_values( ).
+      READ TABLE lt_fixed_values TRANSPORTING NO FIELDS WITH KEY low    = iv_excel_date_format
+                                                                 option = 'EQ'.
+      IF sy-subrc <> 0.
+        CLEAR iv_excel_date_format.
+      ENDIF.
+    ENDIF.
+
+    IF iv_decimal_separator IS NOT SUPPLIED.
+      iv_decimal_separator = get_decimal_separator( ).
+    ENDIF.
+
+    IF iv_excel_date_format IS INITIAL.
+      iv_excel_date_format = cl_abap_datfm=>get_datfm( ).
+    ENDIF.
+
+    start_excel_application(
+      CHANGING
+        cs_excel     = ls_excel
+        cs_workbooks = ls_workbooks ).
+
+    IF ls_excel IS INITIAL.
+      MESSAGE gc_error_starting_excel TYPE if_xo_const_message=>error RAISING error_starting_excel.
+    ENDIF.
+
+    lv_value = iv_filename.
+    CALL METHOD OF
+        ls_workbooks
+        'OPEN'       = ls_workbook
+      EXPORTING
+        #1           = lv_value
+        #3           = 1.
+
+    IF ls_workbook IS INITIAL.
+      stop_excel_application(
+        CHANGING
+          cs_excel     = ls_excel
+          cs_workbooks = ls_workbooks ).
+      MESSAGE gc_error_opening_excel_file TYPE if_xo_const_message=>error RAISING error_opening_excel_file.
+    ENDIF.
+
+    IF iv_excel_worksheet_name IS INITIAL.
+      GET PROPERTY OF ls_workbook 'ACTIVESHEET' = ls_worksheet.
+    ELSE.
+      lv_value = iv_excel_worksheet_name.
+      GET PROPERTY OF ls_workbook 'WORKSHEETS' = ls_worksheet
+      EXPORTING
+        #1 = lv_value.
+      CALL METHOD OF
+        ls_worksheet
+        'ACTIVATE'.
+    ENDIF.
+
+    IF ls_worksheet IS INITIAL.
+      CALL METHOD OF
+        ls_workbook
+        'CLOSE'
+        EXPORTING
+          #1 = 0.
+
+      FREE OBJECT: ls_worksheet, ls_workbook.
+
+      CLEAR: ls_worksheet, ls_workbook.
+
+      stop_excel_application(
+        CHANGING
+          cs_excel     = ls_excel
+          cs_workbooks = ls_workbooks ).
+      lv_value = gc_error_worksheet_not_found.
+      REPLACE FIRST OCCURRENCE OF `&` IN lv_value WITH iv_excel_worksheet_name.
+      MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_worksheet_not_found.
+    ENDIF.
+
+    get_number_of_rows_and_columns(
+      EXPORTING
+        is_worksheet = ls_worksheet
+      IMPORTING
+        ev_num_rows  = lv_num_rows
+        ev_num_cols  = lv_num_cols ).
+
+    IF ( iv_header = abap_false AND
+         lv_num_rows = 0 ) OR
+       ( iv_header = abap_true AND
+         lv_num_rows < 2 ) OR
+       lv_num_cols = 0.
+      CALL METHOD OF
+        ls_workbook
+        'CLOSE'
+        EXPORTING
+          #1 = 0.
+      FREE OBJECT: ls_worksheet, ls_workbook.
+      CLEAR: ls_worksheet, ls_workbook.
+      stop_excel_application(
+        CHANGING
+          cs_excel     = ls_excel
+          cs_workbooks = ls_workbooks ).
+      MESSAGE gc_error_excel_file_is_empty TYPE if_xo_const_message=>error RAISING error_excel_file_is_empty.
+    ENDIF.
+
+    IF iv_header = abap_false.
+      lv_top_left_cell = `A1`.
+      check_columns_for_upload(
+        EXPORTING
+          it_fieldnames            = it_fieldnames
+          it_table                 = et_table
+        RECEIVING
+          rt_fieldnames            = lt_fieldnames
+        EXCEPTIONS
+          error_not_structure      = 1
+          error_field_not_found    = 2
+          error_not_elementary     = 3
+          error_invalid_elementary = 4
+          OTHERS                   = 5 ).
+      lv_rc = sy-subrc.
+      lv_can_ignore_client = abap_true.
+    ELSE.
+      lv_top_left_cell = `A2`.
+      IF iv_column_names_from_header = abap_false.
+        check_columns_for_upload(
+          EXPORTING
+            it_fieldnames            = it_fieldnames
+            it_table                 = et_table
+          RECEIVING
+            rt_fieldnames            = lt_fieldnames
+          EXCEPTIONS
+            error_not_structure      = 1
+            error_field_not_found    = 2
+            error_not_elementary     = 3
+            error_invalid_elementary = 4
+            OTHERS                   = 5 ).
+        lv_rc = sy-subrc.
+        lv_can_ignore_client = abap_true.
+      ELSE.
+        lv_value = get_column_name( lv_num_cols ).
+        CONCATENATE lv_value `1` INTO lv_value.
+        GET PROPERTY OF ls_worksheet 'RANGE' = ls_range
+        EXPORTING
+          #1 = `A1`
+          #2 = lv_value.
+        CALL METHOD OF
+          ls_range
+          'SELECT'.
+        CALL METHOD OF
+          ls_range
+          'CUT'.
+        FREE OBJECT: ls_range.
+        CLEAR: ls_range.
+        lv_value = get_column_name( lv_num_cols + 1 ).
+        CONCATENATE lv_value `1` INTO lv_value.
+        GET PROPERTY OF ls_worksheet 'RANGE' = ls_range
+        EXPORTING
+          #1 = lv_value
+          #2 = lv_value.
+        lv_value = get_column_name( lv_num_cols ).
+        CONCATENATE `=SUMPRODUCT(LEN(A1:` lv_value `1))` INTO lv_value.
+        SET PROPERTY OF ls_range 'FORMULA' = lv_value.
+        GET PROPERTY OF ls_range 'VALUE' = lv_width.
+        FREE OBJECT: ls_range.
+        CLEAR: ls_range.
+        IF lv_width = 0.
+          CALL METHOD OF
+            ls_workbook
+            'CLOSE'
+            EXPORTING
+              #1 = 0.
+          FREE OBJECT: ls_worksheet, ls_workbook.
+          CLEAR: ls_worksheet, ls_workbook.
+          stop_excel_application(
+            CHANGING
+              cs_excel     = ls_excel
+              cs_workbooks = ls_workbooks ).
+          MESSAGE gc_error_invalid_header TYPE if_xo_const_message=>error RAISING error_invalid_header.
+        ENDIF.
+        lv_width = lv_width + ( lv_num_cols - 1 ) + strlen( cl_abap_char_utilities=>cr_lf ).
+        lo_elemdescr = cl_abap_elemdescr=>get_c( lv_width ).
+        lo_tabledescr = cl_abap_tabledescr=>create( lo_elemdescr ).
+        CREATE DATA lr_t_clipboard TYPE HANDLE lo_tabledescr.
+        ASSIGN lr_t_clipboard->* TO <fs_t_clipboard>.
+        cl_gui_frontend_services=>clipboard_import(
+          IMPORTING
+            data                 = <fs_t_clipboard>
+          EXCEPTIONS
+            cntl_error           = 1
+            error_no_gui         = 2
+            not_supported_by_gui = 3
+            OTHERS               = 4 ).
+        READ TABLE <fs_t_clipboard> ASSIGNING <fs_clipboard> INDEX 1.
+        IF sy-subrc <> 0.
+          REFRESH <fs_t_clipboard>.
+          cl_gui_frontend_services=>clipboard_export(
+            IMPORTING
+              data                 = <fs_t_clipboard>
+            CHANGING
+              rc                   = lv_rc
+            EXCEPTIONS
+              cntl_error           = 1
+              error_no_gui         = 2
+              not_supported_by_gui = 3
+              no_authority         = 4
+              OTHERS               = 5 ).
+          CALL METHOD OF
+            ls_workbook
+            'CLOSE'
+            EXPORTING
+              #1 = 0.
+          FREE OBJECT: ls_worksheet, ls_workbook.
+          CLEAR: ls_worksheet, ls_workbook.
+          stop_excel_application(
+            CHANGING
+              cs_excel     = ls_excel
+              cs_workbooks = ls_workbooks ).
+          MESSAGE gc_error_invalid_header TYPE if_xo_const_message=>error RAISING error_invalid_header.
+        ENDIF.
+        CONDENSE <fs_clipboard> NO-GAPS.
+        REFRESH lt_fieldnames.
+        SPLIT <fs_clipboard> AT cl_abap_char_utilities=>horizontal_tab INTO TABLE lt_fieldnames.
+        FREE lr_t_clipboard.
+        check_columns_for_upload(
+          EXPORTING
+            it_fieldnames            = lt_fieldnames
+            it_table                 = et_table
+          RECEIVING
+            rt_fieldnames            = lt_fieldnames
+          EXCEPTIONS
+            error_not_structure      = 1
+            error_field_not_found    = 2
+            error_not_elementary     = 3
+            error_invalid_elementary = 4
+            OTHERS                   = 5 ).
+        lv_rc = sy-subrc.
+        lv_can_ignore_client = abap_false.
+      ENDIF.
+    ENDIF.
+
+    IF lv_rc <> 0.
+      REFRESH <fs_t_clipboard>.
+      cl_gui_frontend_services=>clipboard_export(
+        IMPORTING
+          data                 = <fs_t_clipboard>
+        CHANGING
+          rc                   = lv_rc
+        EXCEPTIONS
+          cntl_error           = 1
+          error_no_gui         = 2
+          not_supported_by_gui = 3
+          no_authority         = 4
+          OTHERS               = 5 ).
+      CALL METHOD OF
+        ls_workbook
+        'CLOSE'
+        EXPORTING
+          #1 = 0.
+      FREE OBJECT: ls_worksheet, ls_workbook.
+      CLEAR: ls_worksheet, ls_workbook.
+      stop_excel_application(
+        CHANGING
+          cs_excel     = ls_excel
+          cs_workbooks = ls_workbooks ).
+    ENDIF.
+
+    lv_value = sy-msgv1.
+    CASE lv_rc.
+      WHEN 1.
+        MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_not_structure.
+      WHEN 2.
+        MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_field_not_found.
+      WHEN 3.
+        MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_not_elementary.
+      WHEN 4.
+        MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_invalid_elementary.
+    ENDCASE.
+
+    CREATE DATA lr_data LIKE LINE OF et_table.
+    ASSIGN lr_data->* TO <fs_data>.
+
+    IF iv_ignore_client = abap_true AND
+       lv_can_ignore_client = abap_true.
+      ASSIGN COMPONENT 1 OF STRUCTURE <fs_data> TO <fs>.
+      IF sy-subrc = 0.
+        lo_typedescr = cl_abap_typedescr=>describe_by_data( <fs> ).
+        IF lo_typedescr->kind = cl_abap_typedescr=>kind_elem.
+          lo_elemdescr ?= lo_typedescr.
+          IF lo_elemdescr->is_ddic_type( ) = abap_true.
+            ls_dfies = lo_elemdescr->get_ddic_field( ).
+            IF ls_dfies-datatype = 'CLNT' AND
+               lines( lt_fieldnames ) > 1.
+              DELETE lt_fieldnames INDEX 1.
+            ENDIF.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    lv_value = lv_num_rows.
+    CONDENSE lv_value NO-GAPS.
+    lv_bottom_right_cell = get_column_name( lv_num_cols ).
+    CONCATENATE lv_bottom_right_cell lv_value INTO lv_bottom_right_cell.
+
+    GET PROPERTY OF ls_worksheet 'RANGE' = ls_range
+    EXPORTING
+      #1 = lv_top_left_cell
+      #2 = lv_bottom_right_cell.
+
+    CALL METHOD OF
+      ls_range
+      'SELECT'.
+
+    CALL METHOD OF
+      ls_range
+      'REPLACE'
+      EXPORTING
+        #1 = cl_abap_char_utilities=>cr_lf(1)
+        #2 = cl_abap_char_utilities=>vertical_tab.
+
+    CALL METHOD OF
+      ls_range
+      'REPLACE'
+      EXPORTING
+        #1 = cl_abap_char_utilities=>newline
+        #2 = cl_abap_char_utilities=>form_feed.
+
+    CALL METHOD OF
+      ls_range
+      'REPLACE'
+      EXPORTING
+        #1 = cl_abap_char_utilities=>horizontal_tab
+        #2 = cl_abap_char_utilities=>backspace.
+
+    CALL METHOD OF
+      ls_range
+      'CUT'.
+
+    FREE OBJECT: ls_range.
+
+    CLEAR: ls_range.
+
+    LOOP AT lt_fieldnames ASSIGNING <fs_fieldnames>.
+      ASSIGN COMPONENT <fs_fieldnames> OF STRUCTURE <fs_data> TO <fs>.
+      IF sy-subrc = 0.
+        lo_typedescr ?= cl_abap_typedescr=>describe_by_data( <fs> ).
+        CASE lo_typedescr->type_kind.
+          WHEN cl_abap_typedescr=>typekind_date.
+            ADD 10 TO lv_extra.
+          WHEN cl_abap_typedescr=>typekind_time.
+            ADD 8 TO lv_extra.
+        ENDCASE.
+      ENDIF.
+    ENDLOOP.
+
+    FREE: lr_data.
+
+    lv_top_left_cell = lv_bottom_right_cell = get_column_name( lv_num_cols + 1 ).
+    IF iv_header = abap_false.
+      CONCATENATE lv_top_left_cell `1` INTO lv_top_left_cell.
+    ELSE.
+      CONCATENATE lv_top_left_cell `2` INTO lv_top_left_cell.
+    ENDIF.
+
+    lv_value = lv_num_rows.
+    CONDENSE lv_value NO-GAPS.
+    CONCATENATE lv_bottom_right_cell lv_value INTO lv_bottom_right_cell.
+
+    lv_top_left_max_cell     = lv_top_left_cell.
+    lv_bottom_right_max_cell = lv_bottom_right_cell.
+
+    GET PROPERTY OF ls_worksheet 'RANGE' = ls_range
+    EXPORTING
+      #1 = lv_top_left_cell
+      #2 = lv_bottom_right_cell.
+
+    IF iv_header = abap_false.
+      lv_top_left_cell = `A1`.
+    ELSE.
+      lv_top_left_cell = `A2`.
+    ENDIF.
+
+    lv_bottom_right_cell = get_column_name( lv_num_cols ).
+    IF iv_header = abap_false.
+      CONCATENATE lv_bottom_right_cell `1` INTO lv_bottom_right_cell.
+    ELSE.
+      CONCATENATE lv_bottom_right_cell `2` INTO lv_bottom_right_cell.
+    ENDIF.
+
+    lv_value = lv_extra.
+    CONDENSE lv_value NO-GAPS.
+    CONCATENATE `=SUMPRODUCT(LEN(` lv_top_left_cell `:` lv_bottom_right_cell `))+` lv_value INTO lv_value.
+
+    SET PROPERTY OF ls_range 'FORMULA' = lv_value.
+
+    FREE OBJECT: ls_range.
+
+    CLEAR: ls_range.
+
+    lv_top_left_cell = get_column_name( lv_num_cols + 1 ).
+    lv_value = lv_num_rows + 1.
+    CONDENSE lv_value NO-GAPS.
+    CONCATENATE lv_top_left_cell lv_value INTO lv_top_left_cell.
+
+    GET PROPERTY OF ls_worksheet 'RANGE' = ls_range
+      EXPORTING
+        #1 = lv_top_left_cell
+        #2 = lv_top_left_cell.
+
+    CONCATENATE `=MAX(` lv_top_left_max_cell `:` lv_bottom_right_max_cell `)` INTO lv_value.
+
+    SET PROPERTY OF ls_range 'FORMULA' = lv_value.
+
+    GET PROPERTY OF ls_range 'VALUE' = lv_width.
+
+    FREE OBJECT: ls_range.
+
+    CLEAR: ls_range.
+
+    lv_width = lv_width + ( lv_num_cols - 1 ) + strlen( cl_abap_char_utilities=>cr_lf ).
+
+    lo_elemdescr = cl_abap_elemdescr=>get_c( lv_width ).
+    lo_tabledescr = cl_abap_tabledescr=>create( lo_elemdescr ).
+
+    CREATE DATA lr_t_clipboard TYPE HANDLE lo_tabledescr.
+    ASSIGN lr_t_clipboard->* TO <fs_t_clipboard>.
+
+    cl_gui_frontend_services=>clipboard_import(
+      IMPORTING
+        data                 = <fs_t_clipboard>
+      EXCEPTIONS
+        cntl_error           = 1
+        error_no_gui         = 2
+        not_supported_by_gui = 3
+        OTHERS               = 4 ).
+
+    LOOP AT <fs_t_clipboard> ASSIGNING <fs_clipboard>.
+      REFRESH lt_excel_wa.
+      SPLIT <fs_clipboard> AT cl_abap_char_utilities=>horizontal_tab INTO TABLE lt_excel_wa.
+      APPEND INITIAL LINE TO et_table ASSIGNING <fs_data>.
+      LOOP AT lt_excel_wa ASSIGNING <fs_excel_wa>.
+        READ TABLE lt_fieldnames ASSIGNING <fs_fieldnames> INDEX sy-tabix.
+        IF sy-subrc <> 0.
+          REFRESH lt_fieldnames.
+          cl_gui_frontend_services=>clipboard_export(
+            IMPORTING
+              data                 = lt_fieldnames
+            CHANGING
+              rc                   = lv_rc
+            EXCEPTIONS
+              cntl_error           = 1
+              error_no_gui         = 2
+              not_supported_by_gui = 3
+              no_authority         = 4
+              OTHERS               = 5 ).
+          CALL METHOD OF
+            ls_workbook
+            'CLOSE'
+            EXPORTING
+              #1 = 0.
+          FREE OBJECT: ls_worksheet,
+                       ls_workbook.
+          CLEAR: ls_worksheet,
+                 ls_workbook.
+          stop_excel_application(
+            CHANGING
+              cs_excel     = ls_excel
+              cs_workbooks = ls_workbooks ).
+
+          MESSAGE gc_error_not_enough_fields TYPE if_xo_const_message=>error RAISING error_not_enough_fields.
+        ENDIF.
+
+        ASSIGN COMPONENT <fs_fieldnames> OF STRUCTURE <fs_data> TO <fs>.
+
+        IF sy-subrc <> 0.
+          REFRESH lt_fieldnames.
+          cl_gui_frontend_services=>clipboard_export(
+            IMPORTING
+              data                 = lt_fieldnames
+            CHANGING
+              rc                   = lv_rc
+            EXCEPTIONS
+              cntl_error           = 1
+              error_no_gui         = 2
+              not_supported_by_gui = 3
+              no_authority         = 4
+              OTHERS               = 5 ).
+          CALL METHOD OF
+            ls_workbook
+            'CLOSE'
+            EXPORTING
+              #1 = 0.
+          FREE OBJECT: ls_worksheet,
+                       ls_workbook.
+          CLEAR: ls_worksheet,
+                 ls_workbook.
+          stop_excel_application(
+            CHANGING
+              cs_excel     = ls_excel
+              cs_workbooks = ls_workbooks ).
+          lv_value = gc_error_field_not_found.
+          REPLACE FIRST OCCURRENCE OF `&` IN lv_value WITH <fs_fieldnames>.
+          MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_field_not_found.
+        ENDIF.
+
+        CASE cl_abap_typedescr=>describe_by_data( <fs> )->type_kind.
+          WHEN cl_abap_typedescr=>typekind_num.
+            IF <fs_excel_wa> IS NOT INITIAL AND
+               <fs_excel_wa> CN `0` AND
+               <fs_excel_wa> CO `0123456789`.
+              CONDENSE <fs_excel_wa> NO-GAPS.
+              <fs> = <fs_excel_wa>.
+            ENDIF.
+
+          WHEN cl_abap_typedescr=>typekind_date.
+            IF <fs_excel_wa> IS NOT INITIAL.
+              CONDENSE <fs_excel_wa> NO-GAPS.
+              TRY.
+                  cl_abap_datfm=>conv_date_ext_to_int(
+                    EXPORTING
+                      im_datext   = <fs_excel_wa>
+                      im_datfmdes = iv_excel_date_format
+                    IMPORTING
+                      ex_datint   = <fs> ).
+                CATCH cx_abap_datfm_no_date .
+                CATCH cx_abap_datfm_invalid_date .
+                CATCH cx_abap_datfm_format_unknown .
+                CATCH cx_abap_datfm_ambiguous .
+                  CLEAR <fs>.
+                  REFRESH lt_fieldnames.
+                  cl_gui_frontend_services=>clipboard_export(
+                    IMPORTING
+                      data                 = lt_fieldnames
+                    CHANGING
+                      rc                   = lv_rc
+                    EXCEPTIONS
+                      cntl_error           = 1
+                      error_no_gui         = 2
+                      not_supported_by_gui = 3
+                      no_authority         = 4
+                      OTHERS               = 5 ).
+                  CALL METHOD OF
+                    ls_workbook
+                    'CLOSE'
+                    EXPORTING
+                      #1 = 0.
+                  FREE OBJECT: ls_worksheet,
+                               ls_workbook.
+                  CLEAR: ls_worksheet,
+                         ls_workbook.
+                  stop_excel_application(
+                    CHANGING
+                      cs_excel     = ls_excel
+                      cs_workbooks = ls_workbooks ).
+                  lv_value = gc_error_invalid_date.
+                  REPLACE FIRST OCCURRENCE OF `&` IN lv_value WITH <fs_excel_wa>.
+                  MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_invalid_date.
+              ENDTRY.
+            ENDIF.
+
+          WHEN cl_abap_typedescr=>typekind_time.
+            IF <fs_excel_wa> IS NOT INITIAL.
+              CONDENSE <fs_excel_wa> NO-GAPS.
+              SPLIT <fs_excel_wa> AT ':' INTO lv_hour lv_min lv_sec.
+              IF lv_hour CO '0123456789'  AND
+                 lv_hour BETWEEN 0 AND 23 AND
+                 lv_min  CO '0123456789'  AND
+                 lv_min  BETWEEN 0 AND 59 AND
+                 lv_sec  CO '0123456789'  AND
+                 lv_sec  BETWEEN 0 AND 59.
+                <fs> = ( lv_hour * 3600 ) + ( lv_min * 60 ) + lv_sec.
+              ELSE.
+                CLEAR <fs>.
+                REFRESH lt_fieldnames.
+                cl_gui_frontend_services=>clipboard_export(
+                  IMPORTING
+                    data                 = lt_fieldnames
+                  CHANGING
+                    rc                   = lv_rc
+                  EXCEPTIONS
+                    cntl_error           = 1
+                    error_no_gui         = 2
+                    not_supported_by_gui = 3
+                    no_authority         = 4
+                    OTHERS               = 5 ).
+                CALL METHOD OF
+                  ls_workbook
+                  'CLOSE'
+                  EXPORTING
+                    #1 = 0.
+                FREE OBJECT: ls_worksheet,
+                             ls_workbook.
+                CLEAR: ls_worksheet,
+                       ls_workbook.
+                stop_excel_application(
+                  CHANGING
+                    cs_excel     = ls_excel
+                    cs_workbooks = ls_workbooks ).
+                lv_value = gc_error_invalid_time.
+                REPLACE FIRST OCCURRENCE OF `&` IN lv_value WITH <fs_excel_wa>.
+                MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_invalid_time.
+              ENDIF.
+            ENDIF.
+
+          WHEN cl_abap_typedescr=>typekind_decfloat   OR
+               cl_abap_typedescr=>typekind_decfloat16 OR
+               cl_abap_typedescr=>typekind_decfloat34 OR
+               cl_abap_typedescr=>typekind_float      OR
+               cl_abap_typedescr=>typekind_int        OR
+               cl_abap_typedescr=>typekind_int1       OR
+               cl_abap_typedescr=>typekind_int2       OR
+               cl_abap_typedescr=>typekind_packed.
+            IF <fs_excel_wa> IS NOT INITIAL.
+              CONDENSE <fs_excel_wa> NO-GAPS.
+              CLEAR lv_value.
+              DO strlen( <fs_excel_wa> ) TIMES.
+                CONCATENATE `0123456789+-` iv_decimal_separator INTO lv_value2.
+                IF <fs_excel_wa>(1) CO lv_value2.
+                  IF <fs_excel_wa>(1) = iv_decimal_separator.
+                    CONCATENATE lv_value '.' INTO lv_value.
+                  ELSE.
+                    CONCATENATE lv_value <fs_excel_wa>(1) INTO lv_value.
+                  ENDIF.
+                ENDIF.
+                SHIFT <fs_excel_wa> LEFT BY 1 PLACES.
+              ENDDO.
+              <fs_excel_wa> = lv_value.
+              TRY.
+                  <fs> = <fs_excel_wa>.
+                CATCH cx_root.
+                  CLEAR <fs>.
+                  REFRESH lt_fieldnames.
+                  cl_gui_frontend_services=>clipboard_export(
+                    IMPORTING
+                      data                 = lt_fieldnames
+                    CHANGING
+                      rc                   = lv_rc
+                    EXCEPTIONS
+                      cntl_error           = 1
+                      error_no_gui         = 2
+                      not_supported_by_gui = 3
+                      no_authority         = 4
+                      OTHERS               = 5 ).
+                  CALL METHOD OF
+                    ls_workbook
+                    'CLOSE'
+                    EXPORTING
+                      #1 = 0.
+                  FREE OBJECT: ls_worksheet,
+                               ls_workbook.
+                  CLEAR: ls_worksheet,
+                         ls_workbook.
+                  stop_excel_application(
+                    CHANGING
+                      cs_excel     = ls_excel
+                      cs_workbooks = ls_workbooks ).
+                  lv_value = gc_error_invalid_large_number.
+                  REPLACE FIRST OCCURRENCE OF `&` IN lv_value WITH <fs_excel_wa>.
+                  MESSAGE lv_value TYPE if_xo_const_message=>error RAISING error_invalid_large_number.
+              ENDTRY.
+            ENDIF.
+
+          WHEN OTHERS.
+            REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>backspace IN <fs_excel_wa>
+              WITH cl_abap_char_utilities=>horizontal_tab.
+            REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>form_feed IN <fs_excel_wa>
+              WITH cl_abap_char_utilities=>newline.
+            REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>vertical_tab IN <fs_excel_wa>
+                WITH cl_abap_char_utilities=>cr_lf(1).
+            <fs> = <fs_excel_wa>.
+        ENDCASE.
+      ENDLOOP.
+    ENDLOOP.
+
+    REFRESH <fs_t_clipboard>.
+    cl_gui_frontend_services=>clipboard_export(
+      IMPORTING
+        data                 = <fs_t_clipboard>
+      CHANGING
+        rc                   = lv_rc
+      EXCEPTIONS
+        cntl_error           = 1
+        error_no_gui         = 2
+        not_supported_by_gui = 3
+        no_authority         = 4
+        OTHERS               = 5 ).
+
+    CALL METHOD OF
+      ls_workbook
+      'CLOSE'
+      EXPORTING
+        #1 = 0.
+
+    FREE OBJECT: ls_worksheet,
+                 ls_workbook.
+
+    CLEAR: ls_worksheet,
+           ls_workbook.
+
+    stop_excel_application(
+      CHANGING
+        cs_excel     = ls_excel
+        cs_workbooks = ls_workbooks ).
+
+  ENDMETHOD.                    "excel_file_upload
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_GUI_EXCEL_SERVICES=>GET_COLUMN_NAME
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_COL                         TYPE        I
+* | [<-()] RV_COL_NAME                    TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_column_name.
+
+    DATA: lv_mod TYPE i.
+
+    CLEAR rv_col_name.
+
+    WHILE iv_col > 0.
+      lv_mod = ( iv_col - 1 ) MOD 26.
+      CONCATENATE sy-abcde+lv_mod(1) rv_col_name INTO rv_col_name.
+      iv_col = ( iv_col - 1 ) DIV 26.
+    ENDWHILE.
+
+  ENDMETHOD.                    "get_excel_column_name
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_GUI_EXCEL_SERVICES=>GET_DECIMAL_SEPARATOR
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_UNAME                       TYPE        BNAME(optional)
+* | [<-()] RV_DECIMAL_SEPARATOR           TYPE        CHAR1
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_decimal_separator.
+
+    DATA: lv_decimal_notation TYPE usr01-dcpfm,
+          lv_value            TYPE dd07v-domvalue_l,
+          lv_notation         TYPE string,
+          lv_len              TYPE i,
+          lo_elemdescr        TYPE REF TO cl_abap_elemdescr,
+          lt_fixed_values     TYPE ddfixvalues.
+
+    FIELD-SYMBOLS: <fs_fixed_values> LIKE LINE OF lt_fixed_values.
+
+    rv_decimal_separator = '.'.
+
+    IF iv_uname IS INITIAL.
+      iv_uname = sy-uname.
+    ENDIF.
+
+    SELECT  SINGLE dcpfm
+      INTO  lv_decimal_notation
+      FROM  usr01
+      WHERE bname = iv_uname.
+
+    CHECK sy-subrc = 0.
+
+    lo_elemdescr ?= cl_abap_typedescr=>describe_by_name( 'XUDCPFM' ).
+    lt_fixed_values = lo_elemdescr->get_ddic_fixed_values( ).
+    READ TABLE lt_fixed_values ASSIGNING <fs_fixed_values> WITH KEY low    = lv_decimal_notation
+                                                                    option = 'EQ'.
+
+    CHECK sy-subrc = 0.
+
+    lv_notation = <fs_fixed_values>-ddtext.
+    CONDENSE lv_notation.
+
+    lv_len = strlen( lv_notation ).
+    WHILE lv_len > 0.
+      SUBTRACT 1 FROM lv_len.
+      IF lv_notation+lv_len CO `0123456789+-`.
+        lv_notation = lv_notation(lv_len).
+      ELSE.
+        rv_decimal_separator = lv_notation+lv_len.
+        EXIT.
+      ENDIF.
+      lv_len = strlen( lv_notation ).
+    ENDWHILE.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_GUI_EXCEL_SERVICES=>GET_NUMBER_OF_ROWS_AND_COLUMNS
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IS_WORKSHEET                   TYPE        OLE2_OBJECT
+* | [<---] EV_NUM_ROWS                    TYPE        I
+* | [<---] EV_NUM_COLS                    TYPE        I
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_number_of_rows_and_columns.
+
+    DATA: ls_range  TYPE ole2_object,
+          ls_range2 TYPE ole2_object.
+
+    CLEAR: ev_num_rows, ev_num_cols.
+
+    CHECK is_worksheet IS NOT INITIAL.
+
+    GET PROPERTY OF is_worksheet 'USEDRANGE' = ls_range.
+
+    GET PROPERTY OF ls_range 'ROWS' = ls_range2.
+    GET PROPERTY OF ls_range2 'COUNT' = ev_num_rows.
+
+    FREE OBJECT: ls_range2.
+    CLEAR:       ls_range2.
+
+    GET PROPERTY OF ls_range 'COLUMNS' = ls_range2.
+    GET PROPERTY OF ls_range2 'COUNT' = ev_num_cols.
+
+    FREE OBJECT: ls_range2.
+    CLEAR:       ls_range2.
+
+    FREE OBJECT: ls_range.
+    CLEAR:       ls_range.
+
+  ENDMETHOD.                    "get_number_of_rows_and_columns
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_GUI_EXCEL_SERVICES=>START_EXCEL_APPLICATION
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_VISIBLE                     TYPE        ABAP_BOOL (default =ABAP_FALSE)
+* | [<-->] CS_EXCEL                       TYPE        OLE2_OBJECT
+* | [<-->] CS_WORKBOOKS                   TYPE        OLE2_OBJECT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD start_excel_application.
+
+    CHECK cs_excel IS INITIAL.
+
+    CREATE OBJECT cs_excel 'EXCEL.APPLICATION'.
+    CHECK cs_excel IS NOT INITIAL.
+
+    IF iv_visible = abap_false.
+      SET PROPERTY OF cs_excel 'SCREENUPDATING' = 0.
+    ELSE.
+      SET PROPERTY OF cs_excel 'VISIBLE' = 1.
+    ENDIF.
+
+    SET PROPERTY OF cs_excel 'DISPLAYALERTS' = 0.
+    SET PROPERTY OF cs_excel 'ALERTBEFOREOVERWRITING' = 0.
+
+    GET PROPERTY OF cs_excel 'WORKBOOKS' = cs_workbooks.
+
+  ENDMETHOD.                    "START_EXCEL_APPLICATION
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_GUI_EXCEL_SERVICES=>STOP_EXCEL_APPLICATION
+* +-------------------------------------------------------------------------------------------------+
+* | [<-->] CS_EXCEL                       TYPE        OLE2_OBJECT
+* | [<-->] CS_WORKBOOKS                   TYPE        OLE2_OBJECT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD stop_excel_application.
+
+    CHECK cs_excel IS NOT INITIAL.
+
+    CALL METHOD OF
+      cs_excel
+      'QUIT'.
+
+    FREE OBJECT: cs_workbooks,
+                 cs_excel.
+
+    CLEAR: cs_workbooks,
+           cs_excel.
+
+  ENDMETHOD.                    "STOP_EXCEL_APPLICATION
+ENDCLASS.
